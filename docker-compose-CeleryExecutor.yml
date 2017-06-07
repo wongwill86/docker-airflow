@@ -11,7 +11,7 @@ services:
             - POSTGRES_DB=airflow
 
     webserver:
-        image: puckel/docker-airflow:1.8.1
+        image: puckel/docker-airflow:latest
         restart: always
         depends_on:
             - postgres
@@ -20,17 +20,21 @@ services:
             - LOAD_EX=y
             - FERNET_KEY=46BKJoQYlPPOexq0OhDZnIlNepKFf87WFwLbfzqDDho=
             - EXECUTOR=Celery
+            - AIRFLOW_HOME=/usr/local/airflow
             # - POSTGRES_USER=airflow
             # - POSTGRES_PASSWORD=airflow
             # - POSTGRES_DB=airflow
         # volumes:
             # - ~/docker-airflow/dags:/usr/local/airflow/dags
+        volumes:
+            - ~/airflow/dags:/usr/local/airflow/dags
+            - /var/run/docker.sock:/var/run/docker.sock
         ports:
             - "8080:8080"
         command: webserver
 
     flower:
-        image: puckel/docker-airflow:1.8.1
+        image: puckel/docker-airflow:latest
         restart: always
         depends_on:
             - redis
@@ -41,31 +45,39 @@ services:
         command: flower
 
     scheduler:
-        image: puckel/docker-airflow:1.8.1
+        image: puckel/docker-airflow:latest
         restart: always
         depends_on:
             - webserver
+        volumes:
+            - ~/airflow/dags:/usr/local/airflow/dags
+            - /var/run/docker.sock:/var/run/docker.sock
         # volumes:
             # - ~/docker-airflow/dags:/usr/local/airflow/dags
         environment:
             - LOAD_EX=y
             - FERNET_KEY=46BKJoQYlPPOexq0OhDZnIlNepKFf87WFwLbfzqDDho=
             - EXECUTOR=Celery
+            - AIRFLOW_HOME=/usr/local/airflow
             # - POSTGRES_USER=airflow
             # - POSTGRES_PASSWORD=airflow
             # - POSTGRES_DB=airflow
         command: scheduler
 
     worker:
-        image: puckel/docker-airflow:1.8.1
+        image: puckel/docker-airflow:latest
         restart: always
         depends_on:
             - scheduler
         # volumes:
             # - ~/docker-airflow/dags:/usr/local/airflow/dags
+        volumes:
+            - ~/airflow/dags:/usr/local/airflow/dags
+            - /var/run/docker.sock:/var/run/docker.sock
         environment:
             - FERNET_KEY=46BKJoQYlPPOexq0OhDZnIlNepKFf87WFwLbfzqDDho=
             - EXECUTOR=Celery
+            - AIRFLOW_HOME=/usr/local/airflow
             # - POSTGRES_USER=airflow
             # - POSTGRES_PASSWORD=airflow
             # - POSTGRES_DB=airflow

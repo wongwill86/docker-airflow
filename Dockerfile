@@ -49,17 +49,21 @@ RUN set -ex \
     && locale-gen \
     && update-locale LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 \
     && useradd -ms /bin/bash -d ${AIRFLOW_HOME} airflow \
-    && curl -fsSL https://get.docker.com/ | sh \
     && python -m pip install -U pip \
+    && pip install -U setuptools \
     && pip install Cython \
     && pip install pytz \
     && pip install pyOpenSSL \
     && pip install ndg-httpsclient \
     && pip install pyasn1 \
     && pip install apache-airflow[crypto,celery,postgres,hive,hdfs,jdbc]==$AIRFLOW_VERSION \
-    && pip install celery[redis]==3.1.17 \
-    && pip install docker-py \
-    && apt-get remove --purge -yqq $buildDeps \
+    && pip install celery[redis]==3.1.17
+
+RUN curl -fsSL https://get.docker.com/ | sh
+RUN pip install docker-py
+RUN pip install git+git://github.com/industrydive/fileflow.git#egg=fileflow
+
+RUN apt-get remove --purge -yqq $buildDeps \
     && apt-get clean \
     && rm -rf \
         /var/lib/apt/lists/* \
@@ -69,14 +73,15 @@ RUN set -ex \
         /usr/share/doc \
         /usr/share/doc-base
 
-RUN pip install docker-py
 
 COPY script/entrypoint.sh /entrypoint.sh
 COPY config/airflow.cfg ${AIRFLOW_HOME}/airflow.cfg
 
+RUN adduser airflow docker
 RUN chown -R airflow: ${AIRFLOW_HOME}
 
 EXPOSE 8080 5555 8793
 
+USER airflow
 WORKDIR ${AIRFLOW_HOME}
 ENTRYPOINT ["/entrypoint.sh"]
