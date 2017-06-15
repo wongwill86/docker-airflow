@@ -1,4 +1,27 @@
 #!/usr/bin/env bash
+DOCKER_SOCKET=/var/run/docker.sock
+DOCKER_GROUP=docker
+AIRFLOW_USER=airflow
+
+# In order run DooD (Docker outside of Docker) we need to make sure the
+# container's docker group id matches the host's group id. If it doens't match,
+# update the group id and then restart the script. (also remove sudoer privs)
+if [ ! -S ${DOCKER_SOCKET} ]; then
+    echo 'Docker socket not found!'
+else
+    DOCKER_GID=$(stat -c '%g' $DOCKER_SOCKET)
+    if $(id -G $AIRFLOW_USER | grep -qw $DOCKER_GID); then
+        echo "User $AIRFLOW_USER in the correct host docker groupid $DOCKER_GID"
+    else
+        echo "User $AIRFLOW_USER not in the correct group $DOCKER_GID"
+        echo "Updating docker group to host docker group $DOCKER_GID"
+        sudo groupmod -g ${DOCKER_GID} ${DOCKER_GROUP}
+        # it doens't protect from docker but it's a little more secure
+        sudo sed -i "/$AIRFLOW_USER/d" /etc/sudoers
+        echo "Restarting script"
+        exec sg $DOCKER_GROUP "$0 $*"
+    fi
+fi
 
 AIRFLOW_HOME="/usr/local/airflow"
 CMD="airflow"
@@ -15,6 +38,7 @@ TRY_LOOP="20"
 : ${POSTGRES_DB:="airflow"}
 
 : ${FERNET_KEY:=$(python -c "from cryptography.fernet import Fernet; FERNET_KEY = Fernet.generate_key().decode(); print(FERNET_KEY)")}
+
 
 # Load DAGs exemples (default: Yes)
 if [ "$LOAD_EX" = "n" ]; then

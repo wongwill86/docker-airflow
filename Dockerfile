@@ -69,6 +69,7 @@ RUN set -ex \
 RUN curl -fsSL https://get.docker.com/ | sh
 RUN pip install docker-py
 RUN pip install awscli
+RUN apt-get install sudo
 
 RUN apt-get remove --purge -yqq $buildDeps \
     && apt-get clean \
@@ -98,6 +99,9 @@ COPY --from=aws_ecr_credential_helper \
 	/bin
 
 RUN adduser airflow docker
+# unfornately this is required to update the container docker gid to match the
+# host's gid, we remove this permission from entrypoint.sh script
+RUN echo "airflow ALL=NOPASSWD: ALL" >> /etc/sudoers
 WORKDIR ${AIRFLOW_HOME}/.docker
 RUN echo '{\n    "credStore": "ecr-login"\n}' > config.json
 RUN chown -R airflow: ${AIRFLOW_HOME}
