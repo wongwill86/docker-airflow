@@ -4,7 +4,7 @@
 # BUILD: docker build --rm -t puckel/docker-airflow .
 # SOURCE: https://github.com/puckel/docker-airflow
 
-# Compile and include the AWS credential helper
+# Compile AWS credential helper
 FROM golang:1.8.3 as aws_ecr_credential_helper
 WORKDIR /go/src/github.com/awslabs/
 RUN git clone https://github.com/awslabs/amazon-ecr-credential-helper.git
@@ -68,7 +68,6 @@ RUN set -ex \
 
 RUN curl -fsSL https://get.docker.com/ | sh
 RUN pip install docker-py
-RUN pip install awscli
 RUN apt-get install sudo
 
 RUN apt-get remove --purge -yqq $buildDeps \
@@ -84,26 +83,21 @@ RUN apt-get remove --purge -yqq $buildDeps \
 COPY script/entrypoint.sh /entrypoint.sh
 COPY config/airflow.cfg ${AIRFLOW_HOME}/airflow.cfg
 
+
+RUN adduser airflow docker
+
+# unfortunately this is required to update the container docker gid to match the
+# host's gid, we remove this permission from entrypoint.sh script
+RUN echo "airflow ALL=NOPASSWD: ALL" >> /etc/sudoers
+WORKDIR ${AIRFLOW_HOME}/.docker
+
+# this is to enable aws ecr credentials helpers to reauthorize docker
+RUN echo '{\n    "credsStore": "ecr-login"\n}' > config.json
 # copy the built docker credentials module to this container
 COPY --from=aws_ecr_credential_helper \
     /go/src/github.com/awslabs/amazon-ecr-credential-helper/bin/local/docker-credential-ecr-login \
     /usr/local/bin
-COPY --from=aws_ecr_credential_helper \
-	/go/src/github.com/awslabs/amazon-ecr-credential-helper/bin/local/docker-credential-ecr-login \
-	/usr/bin
-COPY --from=aws_ecr_credential_helper \
-	/go/src/github.com/awslabs/amazon-ecr-credential-helper/bin/local/docker-credential-ecr-login \
-	/usr/sbin
-COPY --from=aws_ecr_credential_helper \
-	/go/src/github.com/awslabs/amazon-ecr-credential-helper/bin/local/docker-credential-ecr-login \
-	/bin
 
-RUN adduser airflow docker
-# unfornately this is required to update the container docker gid to match the
-# host's gid, we remove this permission from entrypoint.sh script
-RUN echo "airflow ALL=NOPASSWD: ALL" >> /etc/sudoers
-WORKDIR ${AIRFLOW_HOME}/.docker
-RUN echo '{\n    "credStore": "ecr-login"\n}' > config.json
 RUN chown -R airflow: ${AIRFLOW_HOME}
 
 EXPOSE 8080 5555 8793
@@ -111,5 +105,4 @@ EXPOSE 8080 5555 8793
 USER airflow
 WORKDIR ${AIRFLOW_HOME}
 ENTRYPOINT ["/entrypoint.sh"]
-
 
